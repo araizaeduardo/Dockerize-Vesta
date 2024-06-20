@@ -1,3 +1,6 @@
+Dockerize Vesta
+
+
 sudo usermod -aG docker MY-USSER-NAME
 docker pull ubuntu-upstart
 docker run -d -v /vagrant/vesta:/home/admin/web/ -p 8000:8000 -p 80:80 -p 443:443 -p 2222:22 -p 21:21 -p 8083:8083 ubuntu-upstart
