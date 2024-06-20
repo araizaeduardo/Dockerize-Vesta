@@ -1,1 +1,197 @@
+sudo usermod -aG docker MY-USSER-NAME
+docker pull ubuntu-upstart
+docker run -d -v /vagrant/vesta:/home/admin/web/ -p 8000:8000 -p 80:80 -p 443:443 -p 2222:22 -p 21:21 -p 8083:8083 ubuntu-upstart
+docker ps -a
+docker exec -it CONTAINER_NAME /bin/bash
+apt-get update && apt-get -y upgrade
+apt-get -y install curl
+curl -O http://vestacp.com/pub/vst-install.sh
+bash vst-install.sh
+
+=======================================================
+
+
+ _|      _|  _|_|_|_|    _|_|_|  _|_|_|_|_|    _|_|
+ _|      _|  _|        _|            _|      _|    _|
+ _|      _|  _|_|_|      _|_|        _|      _|_|_|_|
+   _|  _|    _|              _|      _|      _|    _|
+     _|      _|_|_|_|  _|_|_|        _|      _|    _|
+
+
+-------------------------------
+  https://your.ip:8083
+  username: admin
+  password: HuwVGtsdLq
+-------------------------------
+
+
+Congratulations,
+you have successfully installed Vesta Control Panel.
+
+exit
+docker ps -a
+docker commit CONTAINER_ID my-name-of-the-container
+
+docker images
+
+root@ac8a9e87adc4:/# service nginx restart
+ * Restarting nginx nginx
+nginx: [emerg] bind() to 172.17.0.13:80 failed (99: Cannot assign requested address)
+nginx: configuration file /etc/nginx/nginx.conf test failed
+
+root@ac8a9e87adc4:/# service apache2 restart
+ * Restarting web server apache2
+AH00548: NameVirtualHost has no effect and will be removed in the next release /etc/apache2/conf.d/172.17.0.13.conf:1
+AH00558: apache2: Could not reliably determine the server's fully qualified domain name, using 172.17.0.2. Set the 'ServerName' directive globally to suppress this message
+(99)Cannot assign requested address: AH00072: make_sock: could not bind to address 172.17.0.13:8080
+no listening sockets available, shutting down
+AH00015: Unable to open logs
+Action 'start' failed.
+The Apache error log may have more information.
+   ...fail!
+ * The apache2 instance did not start within 20 seconds. Please read the log files to discover problems
+
+
+root@ac8a9e87adc4:/# service cron start
+start: Job failed to start
+
+
+How to Auto Change IP Address in VestaCP
+
+wget http://www.nobill.tv/dl/changeip.tar.gz
+tar -zxvf changeip.tar.gz
+mv v-change-server-ip /usr/local/vesta/bin/
+v-change-server-ip OLDIP NEWIP
+
+touch /usr/local/vesta/bin/v-change-server-ip
+chmod 0755 /usr/local/vesta/bin/v-change-server-ip
+
+
+#!/bin/sh
+
+#script to change ips on a VestaCP server.
+#usage:
+# $0 <oldip> <newip>
+
+LOG=/var/log/vesta/system.log
+
+MYUID=`/usr/bin/id -u`
+if [ "$MYUID" != 0 ]; then
+        echo "You require Root Access to run this script";
+        exit 0;
+fi
+
+if [ $# != 2 ] && [ $# != 3 ]; then
+        echo "Usage:";
+        echo "$0 <oldip> <newip> [<file>]";
+        echo "you gave #$#: $0 $1 $2 $3";
+        exit 0;
+fi
+
+OLD_IP=$1
+NEW_IP=$2
+
+HAVE_HTTPD=1
+HAVE_NGINX=1
+
+DATE=`date '+%F %X'`
+BIN=`echo $0 | awk -F/ '{print $NF}'`
+
+log()
+{
+        echo -e "$1";
+        echo -e "$1" >> $LOG;
+}
+
+swapfile()
+{
+        if [ ! -e $1 ]; then
+                log "Cannot Find $1 to change the IPs. Skipping...";
+                return;
+        fi
+
+        TEMP="perl -pi -e 's/${OLD_IP}/${NEW_IP}/g' $1"
+        eval $TEMP;
+
+        log "$DATE $BIN $1\t: $OLD_IP -> $NEW_IP";
+}
+
+if [ $# = 3 ]; then
+        swapfile $3;
+        exit 0;
+fi
+
+
+IPFILE_OLD=/usr/local/vesta/data/ips/$OLD_IP
+IPFILE_NEW=/usr/local/vesta/data/ips/$NEW_IP
+if [ ! -e $IPFILE_OLD ]; then
+        echo -n "$IPFILE_OLD does not exist.  Do you want to continue anyway? (y/n) : ";
+        read YESNO;
+        if [ "$YESNO" != "y" ]; then
+                exit 0;
+        fi
+else
+        mv -f $IPFILE_OLD $IPFILE_NEW
+        log "$DATE $0 $IPFILE_OLD\t: $OLD_IP -> $NEW_IP";
+fi
+
+if [ "${HAVE_HTTPD}" -eq 1 ]; then
+        if [ -e /etc/httpd/conf.d/${OLD_IP}.conf ]; then
+                swapfile /etc/httpd/conf.d/${OLD_IP}.conf
+                mv -f /etc/httpd/conf.d/$OLD_IP.conf /etc/httpd/conf.d/${NEW_IP}.conf
+        fi
+        swapfile /etc/httpd/conf.d/mod_extract_forwarded.conf
+fi
+
+if [ "${HAVE_NGINX}" -eq 1 ]; then
+        if [ -e /etc/nginx/conf.d/${OLD_IP}.conf ]; then
+                swapfile /etc/nginx/conf.d/${OLD_IP}.conf
+                mv -f /etc/nginx/conf.d/$OLD_IP.conf /etc/nginx/conf.d/${NEW_IP}.conf
+        fi
+fi
+
+swapfile /etc/hosts
+
+ULDDU=/usr/local/vesta/data/users
+
+for i in `ls $ULDDU`; do
+{
+
+        if [ ! -d $ULDDU/$i ]; then
+                continue;
+        fi
+
+        swapfile $ULDDU/$i/web.conf
+        swapfile $ULDDU/$i/dns.conf
+        for j in `ls $ULDDU/$i/dns/*.conf`; do
+        {
+                swapfile $j
+        };
+        done;
+
+        if [ "${HAVE_HTTPD}" -eq 1 ]; then
+                swapfile /home/$i/conf/web/httpd.conf
+        fi
+        if [ "${HAVE_NGINX}" -eq 1 ]; then
+                swapfile /home/$i/conf/web/nginx.conf
+        fi
+
+        for j in `ls /home/$i/conf/dns/*.db`; do
+        {
+                swapfile $j
+        };
+        done;
+
+};
+done;
+
+#this is needed to update the serial in the db files.
+if [ "${HAVE_HTTPD}" -eq 1 ]; then
+   service httpd restart
+fi
+if [ "${HAVE_NGINX}" -eq 1 ]; then
+   service nginx restart
+fi
+
+echo "*** Done swapping $OLD_IP to $NEW_IP ***";
 
